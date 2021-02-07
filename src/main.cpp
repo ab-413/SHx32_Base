@@ -72,9 +72,9 @@ const uint16_t disp_node = 01;
 const uint16_t cont_node = 02;
 
 //----------------------------------Параметры для Wi-Fi-------------------------------
-const char *ssid = "DeusNet";
-const char *serverName = "https://deusnet.ru/sh/update.php";
-String apiKeyValue = "gEsTrIt7r3rD";
+const char *ssid = "********";
+const char *serverName = "***********************";
+String apiKeyValue = "**********";
 
 //----------------------------------Структуры с данными-------------------------------
 struct DATA_STRUCTURE
