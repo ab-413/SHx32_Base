@@ -10,9 +10,9 @@
 #include <RF24.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
-#include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include <HTTPClient.h>
+#include <config.h>
 
 #define MAX_DIST_W1 80
 #define PIN_W1_T 12
@@ -59,7 +59,7 @@ const long DISP_interval = 5000; // Отправка данных на дисп�
 unsigned long W_prevMillis = 0;
 const long W_interval = 2000; // Частота измерения уровня воды
 unsigned long Net_prevMillis = 0;
-const long Net_interval = 300000; // Частота измерения уровня воды
+const long Net_interval = 300000; // Частота отправки данных
 
 //----------------------------------Адреса DS18b20-------------------------------
 DeviceAddress ffloor = {0x28, 0xFF, 0xE3, 0xA9, 0x0, 0x16, 0x2, 0x1C};
@@ -69,12 +69,9 @@ DeviceAddress outdoor = {0x28, 0xFF, 0x6C, 0x67, 0x0, 0x16, 0x1, 0x76};
 //----------------------------------Адреса узлов с сети-------------------------------
 const uint16_t this_node = 00;
 const uint16_t disp_node = 01;
-const uint16_t cont_node = 02;
+// const uint16_t cont_node = 02;
 
-//----------------------------------Параметры для Wi-Fi-------------------------------
-const char *ssid = "********";
-const char *serverName = "***********************";
-String apiKeyValue = "**********";
+String apiKeyValue = "clybOaDZNR";
 
 //----------------------------------Структуры с данными-------------------------------
 struct DATA_STRUCTURE
@@ -91,13 +88,13 @@ struct DATA_STRUCTURE
 } __attribute__((packed));
 DATA_STRUCTURE data;
 
-struct CONTAINER_STRUCTURE
-{
-  float temp;
-  float cur_floor_temp;
-  float trgt_floor_temp;
-} __attribute__((packed));
-CONTAINER_STRUCTURE container;
+// struct CONTAINER_STRUCTURE
+// {
+//   float temp;
+//   float cur_floor_temp;
+//   float trgt_floor_temp;
+// } __attribute__((packed));
+// CONTAINER_STRUCTURE container;
 
 //----------------------------------Данные на дисплей-------------------------------
 void display_handler()
@@ -113,8 +110,8 @@ void display_handler()
   lcd.print(data.t3, 1);
   lcd.print(" ");
   lcd.print(data.t4, 1);
-  lcd.print(" ");
-  lcd.print(container.temp, 1);
+  // lcd.print(" ");
+  // lcd.print(container.temp, 1);
   if (PUMP_0_STATE)
   {
     lcd.setCursor(15, 0);
@@ -125,7 +122,7 @@ void display_handler()
     lcd.setCursor(15, 0);
     lcd.print(" ");
   }
-  
+
   if (PUMP_1_STATE)
   {
     lcd.setCursor(15, 1);
@@ -136,60 +133,45 @@ void display_handler()
     lcd.setCursor(15, 1);
     lcd.print(" ");
   }
-  
 }
 
 //----------------------------------Получение данных по RF24-------------------------------
 void net_receive_handler()
-{    
+{
   while (network.available())
   {
     RF24NetworkHeader receiver;
     network.peek(receiver);
     if (receiver.type == 'T')
-    {      
+    {
       network.read(receiver, &data, sizeof(data));
 
       PUMP_0_STATE = data.d_pump;
       OLD_PUMP_0_STATE = PUMP_0_STATE;
       PUMP_1_STATE = data.u_pump;
-      OLD_PUMP_1_STATE = PUMP_1_STATE;      
+      OLD_PUMP_1_STATE = PUMP_1_STATE;
     }
-    if (receiver.type == 'N')
-    {      
-      network.read(receiver, &container, sizeof(container));
+    // if (receiver.type == 'N')
+    // {
+    //   network.read(receiver, &container, sizeof(container));
 
-      data.t5 = container.temp;
-    }
+    //   data.t5 = container.temp;
+    // }
   }
 }
 
 //----------------------------------Отправка данных по RF24-------------------------------
 void net_send_handler()
-{ 
+{
   RF24NetworkHeader transmitter(disp_node, 'T');
-  boolean ok = network.write(transmitter, &data, sizeof(data)); 
-  if (ok) {
+  boolean ok = network.write(transmitter, &data, sizeof(data));
+  if (ok)
+  {
     digitalWrite(BUILTIN_LED, HIGH);
     delay(100);
     digitalWrite(BUILTIN_LED, LOW);
-  }  
+  }
 }
-
-// void net_send(void *pvParameter){
-//     while(1){
-//         network.update();
-
-//         RF24NetworkHeader transmitter(disp_node, 'T');
-//         boolean ok = network.write(transmitter, &data, sizeof(data));
-//         if (ok) {
-//           digitalWrite(BUILTIN_LED, HIGH);
-//           delay(100);
-//           digitalWrite(BUILTIN_LED, LOW);
-//         }     
-//         vTaskDelay(15000 / portTICK_PERIOD_MS);
-//     }
-// }
 
 //----------------------------------Обработка реле-------------------------------
 void relay_handler()
@@ -224,7 +206,7 @@ void net_update_handler()
   {
     HTTPClient http;
 
-    http.begin(serverName);
+    http.begin(uri);
 
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
@@ -253,12 +235,13 @@ void button_handler()
     data.d_pump = PUMP_0_STATE;
     RF24NetworkHeader transmitter(disp_node, 'T');
     boolean ok = network.write(transmitter, &data, sizeof(data));
-    if (ok) {
+    if (ok)
+    {
       digitalWrite(BUILTIN_LED, HIGH);
       delay(100);
       digitalWrite(BUILTIN_LED, LOW);
-    }     
-    
+    }
+
     OLD_PUMP_0_STATE = PUMP_0_STATE;
   }
   if (btn_pump1.fell())
@@ -267,12 +250,13 @@ void button_handler()
     data.u_pump = PUMP_1_STATE;
     RF24NetworkHeader transmitter(disp_node, 'T');
     boolean ok = network.write(transmitter, &data, sizeof(data));
-    if (ok) {
+    if (ok)
+    {
       digitalWrite(BUILTIN_LED, HIGH);
       delay(100);
       digitalWrite(BUILTIN_LED, LOW);
-    }     
-    
+    }
+
     OLD_PUMP_1_STATE = PUMP_1_STATE;
   }
 }
@@ -282,7 +266,7 @@ void button_handler()
 void setup()
 {
   /* Инициализация */
-  Serial.begin(115200);
+  // Serial.begin(115200);
   lcd.init();
   lcd.backlight();
   dht.begin();
@@ -290,9 +274,10 @@ void setup()
 
   SPI.begin();
   radio.begin();
-  network.begin(70, this_node);
+  radio.setChannel(70);
+  network.begin(this_node);
   WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid);
+  WiFi.begin(ssid, pass);
 
   /* Инициализация кнопок */
   btn_pump0.attach(PUMP_0_BTN_PIN);
@@ -314,30 +299,35 @@ void setup()
   ArduinoOTA.setPassword("fktrc");
 
   ArduinoOTA
-    .onStart([]() {
-      String type;
-      if (ArduinoOTA.getCommand() == U_FLASH)
-        type = "sketch";
-      else // U_SPIFFS
-        type = "filesystem";
+      .onStart([]()
+               {
+                 String type;
+                 if (ArduinoOTA.getCommand() == U_FLASH)
+                   type = "sketch";
+                 else // U_SPIFFS
+                   type = "filesystem";
 
-      // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-      Serial.println("Start updating " + type);
-    })
-    .onEnd([]() {
-      Serial.println("\nEnd");
-    })
-    .onProgress([](unsigned int progress, unsigned int total) {
-      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-    })
-    .onError([](ota_error_t error) {
-      Serial.printf("Error[%u]: ", error);
-      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-      else if (error == OTA_END_ERROR) Serial.println("End Failed");
-    });
+                 // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+                 Serial.println("Start updating " + type);
+               })
+      .onEnd([]()
+             { Serial.println("\nEnd"); })
+      .onProgress([](unsigned int progress, unsigned int total)
+                  { Serial.printf("Progress: %u%%\r", (progress / (total / 100))); })
+      .onError([](ota_error_t error)
+               {
+                 Serial.printf("Error[%u]: ", error);
+                 if (error == OTA_AUTH_ERROR)
+                   Serial.println("Auth Failed");
+                 else if (error == OTA_BEGIN_ERROR)
+                   Serial.println("Begin Failed");
+                 else if (error == OTA_CONNECT_ERROR)
+                   Serial.println("Connect Failed");
+                 else if (error == OTA_RECEIVE_ERROR)
+                   Serial.println("Receive Failed");
+                 else if (error == OTA_END_ERROR)
+                   Serial.println("End Failed");
+               });
 
   ArduinoOTA.begin();
 
@@ -351,9 +341,8 @@ void setup()
   data.u_pump = 0;
   data.d_pump = 0;
 
-  container.temp = 0;
+  // container.temp = 0;
 
-  //xTaskCreate(&net_send, "net_send", 2048, NULL, 1, NULL);
 }
 
 //////////////////////////////////////////////////////////
@@ -364,10 +353,10 @@ void loop()
   unsigned long currentMillis = millis();
   network.update();
   btn_pump0.update();
-  btn_pump1.update(); 
+  btn_pump1.update();
 
   //---------------------------------- Прием данных 2.4GHz wireless -------------------------------
-  net_receive_handler(); 
+  net_receive_handler();
 
   //----------------------------------Обработка кнопок-------------------------------
 
@@ -405,7 +394,8 @@ void loop()
   }
 
   //----------------------------------Отправка данных в облако-------------------------------
-  if (currentMillis - Net_prevMillis >= Net_interval){
+  if (currentMillis - Net_prevMillis >= Net_interval)
+  {
     Net_prevMillis = currentMillis;
     net_update_handler();
   }
