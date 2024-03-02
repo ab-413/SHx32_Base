@@ -274,7 +274,7 @@ void setup()
 
   SPI.begin();
   radio.begin();
-  radio.setChannel(70);
+  radio.setChannel(77);
   network.begin(this_node);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, pass);
