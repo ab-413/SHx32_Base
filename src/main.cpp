@@ -43,7 +43,7 @@ RF24Network network(radio);
 PromLokiTransport transport;
 PromClient client(transport);
 
-WriteRequest req(8);
+WriteRequest req(8,2048);
 
 TimeSeries ts1(5, "ambient_temp_celsius", "{host=\"esp32\",city=\"olekminsk\",location=\"top30\",user=\"alex\"}");
 TimeSeries ts2(5, "ambient_humidity_percents", "{host=\"esp32\",city=\"olekminsk\",location=\"top30\",user=\"alex\"}");
@@ -95,6 +95,14 @@ struct DATA_STRUCTURE
   boolean u_pump;
 } __attribute__((packed));
 DATA_STRUCTURE data;
+
+void blink()
+{
+  digitalWrite(BUILTIN_LED, HIGH);
+  delay(50);
+  digitalWrite(BUILTIN_LED, LOW);
+  delay(50);
+}
 
 //----------------------------------Данные на дисплей-------------------------------
 void display_handler()
@@ -197,17 +205,18 @@ void cloud_update_handler(int64_t unix_time)
 {
   ts1.addSample(unix_time, data.t4);
   ts2.addSample(unix_time, data.humidity);
-  ts1.addSample(unix_time, data.w1);
-  ts2.addSample(unix_time, data.t1);
-  ts1.addSample(unix_time, data.t2);
-  ts2.addSample(unix_time, data.t3);
-  ts1.addSample(unix_time, data.u_pump);
-  ts2.addSample(unix_time, data.d_pump);
+  ts3.addSample(unix_time, data.w1);
+  ts4.addSample(unix_time, data.t1);
+  ts5.addSample(unix_time, data.t2);
+  ts6.addSample(unix_time, data.t3);
+  ts7.addSample(unix_time, data.u_pump);
+  ts8.addSample(unix_time, data.d_pump);
 
   PromClient::SendResult res = client.send(req);
 
   if (!res == PromClient::SendResult::SUCCESS)
   {
+    // Serial.println(client.errmsg);
     digitalWrite(BUILTIN_LED, HIGH);
     delay(50);
     digitalWrite(BUILTIN_LED, LOW);
@@ -279,19 +288,29 @@ void setup()
 
   SPI.begin();
   radio.begin();
-  radio.setChannel(70);
+  radio.setChannel(77);
   network.begin(this_node);
 
   transport.setWifiSsid(WIFI_SSID);
   transport.setWifiPass(WIFI_PASSWORD);
-  transport.begin();
+  // transport.setDebug(Serial);
+  if (!transport.begin())
+  {
+    Serial.println(transport.errmsg);
+    while (true) blink();
+  }
 
   client.setUrl(URL);
   client.setPath((char *)PATH);
   client.setPort(PORT);
   client.setUser(USER);
   client.setPass(PASS);
-  client.begin();
+  // client.setDebug(Serial);
+  if (!client.begin())
+  {
+    Serial.println(client.errmsg);
+    while (true) blink();
+  }
 
   req.addTimeSeries(ts1);
   req.addTimeSeries(ts2);
@@ -301,6 +320,7 @@ void setup()
   req.addTimeSeries(ts6);
   req.addTimeSeries(ts7);
   req.addTimeSeries(ts8);
+  // req.setDebug(Serial);
 
   /* Инициализация кнопок */
   btn_pump0.attach(PUMP_0_BTN_PIN);
